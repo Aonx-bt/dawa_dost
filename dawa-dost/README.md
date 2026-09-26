@@ -179,6 +179,9 @@ production, use your Railway/Render URL.
 
 ## 8. Sarvam setup
 
+For what the voice agent actually does on a call - the conversation itself,
+not just the API wiring - see [`docs/SAMVAAD_VOICE_AGENT.md`](docs/SAMVAAD_VOICE_AGENT.md).
+
 - **Document AI / Translate**: only needs `SARVAM_API_KEY`. See
   `app/services/sarvam_vision.py` (calls `doc_ai.extract()`, polls
   `get_status()`, reads `get_results()`) and `app/services/sarvam_translate.py`
