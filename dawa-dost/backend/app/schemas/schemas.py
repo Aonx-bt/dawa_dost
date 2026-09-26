@@ -314,3 +314,40 @@ class DashboardOut(BaseModel):
     today: list[TodayDoseOut]
     symptom_trends: list[SymptomTrendOut]
     recent_calls: list[CallOut]
+
+
+# ---------------------------------------------------------------------------
+# Medicine insights (informational only - see app/services/medicine_reference.py)
+# ---------------------------------------------------------------------------
+
+
+class MedicineInsightsRequest(BaseModel):
+    medicine_names: list[str] = Field(min_length=1, max_length=20)
+
+
+class MedicinePricing(BaseModel):
+    branded_price_inr: float | None
+    generic_name: str | None
+    generic_price_inr: float | None
+    cheaper_generic_available: bool
+    source: str | None
+
+
+class MedicineInsight(BaseModel):
+    medicine_name: str
+    description: str
+    drug_class: str
+    common_uses: list[str]
+    pricing: MedicinePricing
+
+
+class InteractionFlag(BaseModel):
+    medicines: list[str]
+    note: str
+    recommendation: str
+
+
+class MedicineInsightsResponse(BaseModel):
+    medicines: list[MedicineInsight]
+    interaction_flags: list[InteractionFlag]
+    disclaimer: str

@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
-from app.routers import calls, dashboard, demo, medications, prescriptions, translate, voice, webhooks
+from app.routers import calls, dashboard, demo, insights, medications, prescriptions, translate, voice, webhooks
 from app.seed import seed
 from app.services.scheduler import reminder_scheduler
 
@@ -46,6 +46,7 @@ app.include_router(dashboard.router)
 app.include_router(calls.router)
 app.include_router(demo.router)
 app.include_router(translate.router)
+app.include_router(insights.router)
 
 
 @app.get("/health")

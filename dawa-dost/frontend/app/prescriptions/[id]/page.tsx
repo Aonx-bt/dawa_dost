@@ -9,7 +9,8 @@ import { ErrorState, LoadingState } from "@/components/States";
 import { ReviewBadge } from "@/components/Badge";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslatedTexts } from "@/hooks/useTranslatedTexts";
-import type { ExtractedMedication, Prescription } from "@/types";
+import { useMedicineInsights } from "@/hooks/useMedicineInsights";
+import type { ExtractedMedication, MedicineInsight, Prescription } from "@/types";
 
 const AMBIGUOUS_CODES = new Set(["sos", "prn", "bd", "tds", "qds", "stat"]);
 
@@ -153,6 +154,16 @@ function PrescriptionReview({
   const { translated: translatedDiagnoses } = useTranslatedTexts(prescription.diagnoses);
   const { translated: translatedSymptoms } = useTranslatedTexts(prescription.symptoms);
 
+  const { insights } = useMedicineInsights(meds.map((m) => m.medicine_name));
+  const insightFor = (name: string): MedicineInsight | undefined =>
+    insights?.medicines.find((i) => i.medicine_name.toLowerCase() === name.toLowerCase());
+  const { translated: translatedDescriptions } = useTranslatedTexts(
+    meds.map((m) => insightFor(m.medicine_name)?.description || ""),
+  );
+  const { translated: translatedInteractionNotes } = useTranslatedTexts(
+    (insights?.interaction_flags || []).map((f) => f.note),
+  );
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-start justify-between pt-2">
@@ -186,10 +197,28 @@ function PrescriptionReview({
         </Card>
       )}
 
+      {insights && insights.interaction_flags.length > 0 && (
+        <Card className="border border-amber-200 bg-amber-50 p-4">
+          <p className="mb-2 flex items-center gap-1 text-sm font-semibold text-amber-800">
+            ⚠ Worth confirming with your doctor
+          </p>
+          {insights.interaction_flags.map((flag, i) => (
+            <div key={i} className="mb-2 last:mb-0">
+              <p className="text-sm text-amber-900">
+                <span className="font-medium">{flag.medicines.join(" + ")}: </span>
+                {translatedInteractionNotes[i]}
+              </p>
+              <p className="text-xs text-amber-700">{flag.recommendation}</p>
+            </div>
+          ))}
+        </Card>
+      )}
+
       <div className="flex flex-col gap-3">
         {meds.map((med, i) => {
           const flagged = needsReview(med);
           const editing = editingIndex === i;
+          const insight = insightFor(med.medicine_name);
           return (
             <Card key={i} className="p-4">
               <div className="mb-2 flex items-start justify-between">
@@ -201,6 +230,23 @@ function PrescriptionReview({
                 </div>
                 {flagged && <ReviewBadge />}
               </div>
+
+              {insight && (
+                <div className="mb-3 rounded-lg bg-slate-50 p-3">
+                  <p className="text-xs text-slate-600">{translatedDescriptions[i]}</p>
+                  {insight.pricing.cheaper_generic_available && (
+                    <p className="mt-2 text-xs">
+                      <span className="text-slate-400 line-through">
+                        ₹{insight.pricing.branded_price_inr}
+                      </span>{" "}
+                      <span className="font-semibold text-emerald-700">
+                        ₹{insight.pricing.generic_price_inr} generic ({insight.pricing.generic_name})
+                      </span>
+                      <span className="ml-1 text-slate-400">· {insight.pricing.source}</span>
+                    </p>
+                  )}
+                </div>
+              )}
 
               {editing ? (
                 <div className="flex flex-col gap-2">
@@ -252,6 +298,10 @@ function PrescriptionReview({
           );
         })}
       </div>
+
+      {insights && (
+        <p className="px-1 text-xs text-slate-400">{insights.disclaimer}</p>
+      )}
 
       <button
         onClick={handleConfirm}

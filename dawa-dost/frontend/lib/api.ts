@@ -2,6 +2,7 @@ import type {
   Call,
   Dashboard,
   Medication,
+  MedicineInsightsResponse,
   Prescription,
   Reminder,
 } from "@/types";
@@ -133,5 +134,11 @@ export const api = {
         target_language_code: targetLanguageCode,
         source_language_code: sourceLanguageCode,
       }),
+    }),
+
+  getMedicineInsights: (medicineNames: string[]) =>
+    request<MedicineInsightsResponse>("/api/medicine-insights", {
+      method: "POST",
+      body: JSON.stringify({ medicine_names: medicineNames }),
     }),
 };

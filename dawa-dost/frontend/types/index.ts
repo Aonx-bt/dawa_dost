@@ -120,6 +120,34 @@ export interface Dashboard {
   recent_calls: Call[];
 }
 
+export interface MedicinePricing {
+  branded_price_inr: number | null;
+  generic_name: string | null;
+  generic_price_inr: number | null;
+  cheaper_generic_available: boolean;
+  source: string | null;
+}
+
+export interface MedicineInsight {
+  medicine_name: string;
+  description: string;
+  drug_class: string;
+  common_uses: string[];
+  pricing: MedicinePricing;
+}
+
+export interface InteractionFlag {
+  medicines: string[];
+  note: string;
+  recommendation: string;
+}
+
+export interface MedicineInsightsResponse {
+  medicines: MedicineInsight[];
+  interaction_flags: InteractionFlag[];
+  disclaimer: string;
+}
+
 export interface ApiErrorDetail {
   message?: string;
   hint?: string;
