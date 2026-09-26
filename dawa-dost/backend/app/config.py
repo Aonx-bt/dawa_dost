@@ -15,11 +15,25 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
 
-    # Sarvam
+    # Sarvam - Document AI / Translate (client.doc_ai / client.text)
     sarvam_api_key: str = ""
-    sarvam_agent_id: str = ""
-    sarvam_deployment_id: str = ""
+
+    # Sarvam Voice Agents (Samvaad) - https://docs.sarvam.ai/conversations
+    # Separate API key from the one above; created at
+    # https://indus.sarvam.ai/samvaad/settings/api-key
+    sarvam_voice_api_key: str = ""
+    sarvam_org_id: str = ""
+    sarvam_workspace_id: str = ""
+    sarvam_app_id: str = ""  # the deployed voice agent's app id
+    sarvam_app_version: int = 1
+    sarvam_connection_id: str = ""  # telephony connection (what "deployment id" actually is)
+    sarvam_agent_phone_number: str = ""  # the number the agent calls FROM
+    # Shared secret we append to our own webhook URL as ?token=... since
+    # Sarvam's webhook has no documented signature/verification scheme.
     sarvam_webhook_secret: str = ""
+    # Publicly reachable base URL for this backend, used to build the
+    # webhook_config.url Sarvam calls back to (must not be localhost).
+    public_backend_url: str = ""
 
     # App
     next_public_api_url: str = "http://localhost:8000"

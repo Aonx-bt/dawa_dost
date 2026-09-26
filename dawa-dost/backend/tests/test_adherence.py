@@ -53,9 +53,9 @@ def test_missed_via_webhook_refused_outcome(client, db_session):
     resp = client.post(
         "/api/webhooks/sarvam",
         json={
-            "interaction_id": "test-missed-1",
-            "reminder_id": reminder.id,
-            "outcome": {"refused": True},
+            "attempt_id": "test-missed-1",
+            "status": "no-answer",
+            "webhook_config": {"url": "https://example.com/webhook", "metadata": {"reminder_id": reminder.id}},
         },
     )
     assert resp.status_code == 200

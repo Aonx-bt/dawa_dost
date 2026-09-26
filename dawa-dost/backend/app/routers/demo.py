@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Reminder, User
 from app.routers.webhooks import process_sarvam_outcome
-from app.schemas.schemas import SarvamWebhookPayload, StructuredCallOutcome
+from app.schemas.schemas import SarvamTranscriptTurn, SarvamWebhookConfigEcho, SarvamWebhookPayload, StructuredCallOutcome
 from app.utils.current_user import get_current_user
 from app.utils.errors import not_found
 
@@ -39,13 +39,37 @@ def simulate_outcome(body: SimulateOutcomeRequest, db: Session = Depends(get_db)
         raise not_found("Reminder")
 
     now = datetime.utcnow()
+    outcome = body.outcome
+    # Mirror the real webhook shape: our outcome flags travel as
+    # final_agent_variables (what the real Samvaad agent would set), and
+    # reminder_id travels via webhook_config.metadata (what we set when
+    # triggering the call) - see SarvamWebhookPayload.to_structured_outcome
+    # and .reminder_id.
     payload = SarvamWebhookPayload(
+        attempt_id=f"demo-{reminder.id}-{int(now.timestamp())}",
+        status="connected",
+        duration=45.0,
         interaction_id=f"demo-{reminder.id}-{int(now.timestamp())}",
-        reminder_id=reminder.id,
-        started_at=now,
-        ended_at=now,
-        duration=45,
-        transcript="[Demo Mode] Simulated call - no real phone call was placed.",
-        outcome=body.outcome,
+        final_agent_variables={
+            "medication_taken": outcome.medication_taken,
+            "snooze_requested": outcome.snooze_requested,
+            "snooze_minutes": outcome.snooze_minutes,
+            "symptom_reported": outcome.symptom_reported,
+            "symptom_name": outcome.symptom_name,
+            "symptom_severity": outcome.symptom_severity,
+            "symptom_trend": outcome.symptom_trend,
+            "side_effect_reported": outcome.side_effect_reported,
+            "side_effect_name": outcome.side_effect_name,
+            "side_effect_severity": outcome.side_effect_severity,
+            "refused": outcome.refused,
+        },
+        webhook_config=SarvamWebhookConfigEcho(
+            url="demo://simulated", metadata={"reminder_id": reminder.id}
+        ),
+        interaction_transcript=[
+            SarvamTranscriptTurn(
+                role="system", en_text="[Demo Mode] Simulated call - no real phone call was placed."
+            )
+        ],
     )
     return process_sarvam_outcome(db, payload)

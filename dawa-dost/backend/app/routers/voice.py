@@ -36,24 +36,23 @@ def trigger_call(body: TriggerCallRequest, db: Session = Depends(get_db)):
     if not medication or not user:
         raise bad_request("Reminder is missing its medication or user context.")
 
-    context = {
-        "user_id": user.id,
-        "reminder_id": reminder.id,
-        "medication_id": medication.id,
+    agent_variables = {
+        "patient_name": user.name,
         "medication_name": medication.name,
-        "dose": medication.dose,
-        "food_instruction": medication.food_instruction,
+        "dose": medication.dose or "",
+        "food_instruction": medication.food_instruction or "",
         "scheduled_time": reminder.scheduled_at.strftime("%H:%M"),
     }
+    metadata = {"reminder_id": reminder.id, "medication_id": medication.id, "user_id": user.id}
     try:
-        interaction_id = sarvam_voice_service.trigger_call(user.phone, context)
+        attempt_id = sarvam_voice_service.trigger_call(user.phone, agent_variables, metadata)
     except VoiceCallError as exc:
-        raise upstream_failure("Sarvam Samvaad", str(exc))
+        raise upstream_failure("Sarvam Voice Agents", str(exc))
 
     reminder.status = "TRIGGERED"
     reminder.updated_at = datetime.utcnow()
     db.commit()
-    return {"status": "triggered", "interaction_id": interaction_id}
+    return {"status": "triggered", "attempt_id": attempt_id}
 
 
 @router.post("/context")

@@ -91,9 +91,9 @@ def test_process_due_reminders_triggers_due_jobs(db_session, monkeypatch):
 
     called = {}
 
-    def fake_trigger_call(phone, context):
-        called["reminder_id"] = context["reminder_id"]
-        return "fake-interaction-id"
+    def fake_trigger_call(phone, agent_variables, metadata):
+        called["reminder_id"] = metadata["reminder_id"]
+        return "fake-attempt-id"
 
     monkeypatch.setattr(
         scheduler_module.sarvam_voice_service, "trigger_call", fake_trigger_call

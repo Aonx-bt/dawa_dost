@@ -191,17 +191,94 @@ class StructuredCallOutcome(BaseModel):
     refused: bool = False
 
 
-class SarvamWebhookPayload(BaseModel):
-    """Inbound webhook payload from Sarvam Samvaad after a call finishes."""
+class SarvamChannelInfo(BaseModel):
+    channel_type: str
+    channel_provider: str
+    agent_phone_number: str
 
-    interaction_id: str
-    reminder_id: str | None = None
-    call_id: str | None = None
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
-    duration: int | None = None
-    transcript: str | None = None
-    outcome: StructuredCallOutcome = Field(default_factory=StructuredCallOutcome)
+
+class SarvamWebhookConfigEcho(BaseModel):
+    url: str
+    metadata: dict[str, Any] | None = None
+
+
+class SarvamTranscriptTurn(BaseModel):
+    role: str
+    en_text: str
+
+
+class SarvamWebhookPayload(BaseModel):
+    """Real inbound webhook payload from Sarvam Voice Agents after a call
+    finishes. Shape per:
+    https://docs.sarvam.ai/conversations/api/instant-outbound/webhook-payload
+
+    Sarvam gives us no structured "outcome" object directly - the agent is
+    expected to set `final_agent_variables` during the call (medication_taken,
+    snooze_requested, symptom_name, ...), which we parse via
+    to_structured_outcome(). We correlate the call back to our reminder via
+    `webhook_config.metadata.reminder_id`, which we set ourselves when
+    triggering the call (see SarvamVoiceService.trigger_call).
+    """
+
+    attempt_id: str
+    status: str
+    channel_info: SarvamChannelInfo | None = None
+    duration: float | None = None
+    interaction_id: str | None = None
+    failure_reason: str | None = None
+    final_agent_variables: dict[str, Any] | None = None
+    webhook_config: SarvamWebhookConfigEcho | None = None
+    interaction_transcript: list[SarvamTranscriptTurn] | None = None
+
+    @property
+    def reminder_id(self) -> str | None:
+        if self.webhook_config and self.webhook_config.metadata:
+            value = self.webhook_config.metadata.get("reminder_id")
+            return str(value) if value is not None else None
+        return None
+
+    @property
+    def transcript_text(self) -> str | None:
+        if not self.interaction_transcript:
+            return None
+        return "\n".join(f"{t.role}: {t.en_text}" for t in self.interaction_transcript)
+
+    def to_structured_outcome(self) -> StructuredCallOutcome:
+        """Best-effort parse of the agent's final_agent_variables into our
+        internal StructuredCallOutcome shape. The Samvaad agent must be
+        configured to set these variable names during the call."""
+        variables = self.final_agent_variables or {}
+
+        def as_bool(key: str) -> bool:
+            value = variables.get(key)
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                return value.strip().lower() in ("true", "1", "yes")
+            return False
+
+        def as_int(key: str) -> int | None:
+            value = variables.get(key)
+            try:
+                return int(value) if value is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        call_failed = self.status in ("no-answer", "failed", "busy", "declined")
+
+        return StructuredCallOutcome(
+            medication_taken=as_bool("medication_taken"),
+            snooze_requested=as_bool("snooze_requested"),
+            snooze_minutes=as_int("snooze_minutes") or 30,
+            symptom_reported=as_bool("symptom_reported"),
+            symptom_name=variables.get("symptom_name"),
+            symptom_severity=as_int("symptom_severity"),
+            symptom_trend=variables.get("symptom_trend"),
+            side_effect_reported=as_bool("side_effect_reported"),
+            side_effect_name=variables.get("side_effect_name"),
+            side_effect_severity=as_int("side_effect_severity"),
+            refused=call_failed or as_bool("refused"),
+        )
 
 
 # ---------------------------------------------------------------------------

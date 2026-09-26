@@ -95,21 +95,20 @@ class ReminderScheduler:
                 logger.error("Reminder %s missing medication/user", reminder_id)
                 return
 
-            context = {
-                "user_id": user.id,
-                "reminder_id": reminder.id,
-                "medication_id": medication.id,
+            agent_variables = {
+                "patient_name": user.name,
                 "medication_name": medication.name,
-                "dose": medication.dose,
-                "food_instruction": medication.food_instruction,
+                "dose": medication.dose or "",
+                "food_instruction": medication.food_instruction or "",
                 "scheduled_time": reminder.scheduled_at.strftime("%H:%M"),
             }
+            metadata = {"reminder_id": reminder.id, "medication_id": medication.id, "user_id": user.id}
             try:
-                interaction_id = sarvam_voice_service.trigger_call(user.phone, context)
+                attempt_id = sarvam_voice_service.trigger_call(user.phone, agent_variables, metadata)
                 reminder.status = "TRIGGERED"
                 reminder.updated_at = datetime.utcnow()
                 db.commit()
-                logger.info("Triggered Samvaad call %s for reminder %s", interaction_id, reminder_id)
+                logger.info("Triggered Samvaad call %s for reminder %s", attempt_id, reminder_id)
             except VoiceCallError as exc:
                 logger.error("Voice call failed for reminder %s: %s", reminder_id, exc)
                 # Leave reminder PENDING so it can be retried/triggered manually

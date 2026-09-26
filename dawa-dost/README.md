@@ -131,11 +131,20 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# Sarvam
-SARVAM_API_KEY=            # used for both Document AI and Samvaad
-SARVAM_AGENT_ID=           # your existing Samvaad agent
-SARVAM_DEPLOYMENT_ID=      # your existing Samvaad deployment
-SARVAM_WEBHOOK_SECRET=     # shared secret Samvaad sends back on webhooks
+# Sarvam - Document AI (prescription extraction) & Text Translate
+SARVAM_API_KEY=
+
+# Sarvam Voice Agents (Samvaad) - separate API key, created at
+# https://indus.sarvam.ai/samvaad/settings/api-key
+SARVAM_VOICE_API_KEY=
+SARVAM_ORG_ID=
+SARVAM_WORKSPACE_ID=
+SARVAM_APP_ID=              # the deployed voice agent's app id
+SARVAM_APP_VERSION=1
+SARVAM_CONNECTION_ID=       # telephony connection ("deployment id")
+SARVAM_AGENT_PHONE_NUMBER=  # number the agent calls FROM
+SARVAM_WEBHOOK_SECRET=      # our own shared secret, appended to the webhook URL
+PUBLIC_BACKEND_URL=         # publicly reachable URL for THIS backend
 
 # Application
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -145,8 +154,15 @@ CORS_ORIGINS=http://localhost:3000
 
 Sarvam credentials are read server-side only (`app/config.py`) and are never
 sent to the frontend. `SARVAM_API_KEY` alone is enough to test prescription
-extraction; `SARVAM_AGENT_ID`/`SARVAM_DEPLOYMENT_ID` are additionally needed
-to place real Samvaad calls (see Demo Mode below for a fallback).
+extraction and translation. Placing real Voice Agent calls additionally
+needs every `SARVAM_*`/`PUBLIC_BACKEND_URL` variable above filled in (see
+Demo Mode below for a fallback when they aren't).
+
+`PUBLIC_BACKEND_URL` matters because Sarvam calls your webhook from its own
+servers - `http://localhost:8000` is not reachable from there. For local
+development, expose your backend with a tunnel (e.g. `ngrok http 8000`) and
+set `PUBLIC_BACKEND_URL` to the `https://...ngrok...` URL it gives you; in
+production, use your Railway/Render URL.
 
 ## 7. Supabase setup (for real deployment)
 
@@ -163,23 +179,41 @@ to place real Samvaad calls (see Demo Mode below for a fallback).
 
 ## 8. Sarvam setup
 
-- **Document AI**: only needs `SARVAM_API_KEY`. See
-  `app/services/sarvam_vision.py` - it calls `doc_ai.extract()` with a JSON
-  schema, polls `get_status()`, then reads `get_results()`.
-- **Samvaad**: point your existing agent's tool-calling / webhook config at
-  this backend:
+- **Document AI / Translate**: only needs `SARVAM_API_KEY`. See
+  `app/services/sarvam_vision.py` (calls `doc_ai.extract()`, polls
+  `get_status()`, reads `get_results()`) and `app/services/sarvam_translate.py`
+  (`text.translate()`).
+
+- **Voice Agents (Samvaad)**: uses Sarvam's documented Instant Outbound Call
+  API (https://docs.sarvam.ai/conversations/api/instant-outbound/create):
   - Backend → Samvaad: `SarvamVoiceService.trigger_call()` posts to
-    `POST https://api.sarvam.ai/samvaad/calls` with `agent_id`,
-    `deployment_id`, `to_number`, and a minimal `context` object
-    (`reminder_id`, `medication_id`, `medication_name`, `dose`,
-    `food_instruction`, `scheduled_time`).
-  - Samvaad → Backend (tool calls during the call):
+    `POST https://apps.sarvam.ai/api/outbounds/v1/orgs/{org_id}/workspaces/{workspace_id}/outbounds`
+    with `X-API-Key: SARVAM_VOICE_API_KEY`, the agent's `app_id`/`app_version`/
+    `connection_id`/`agent_phone_number`, a minimal `agent_variables` object
+    (`patient_name`, `medication_name`, `dose`, `food_instruction`,
+    `scheduled_time`), and a `webhook_config.metadata` carrying our
+    `reminder_id` so we can correlate the later webhook back to this
+    reminder. Returns an `attempt_id`.
+  - Samvaad → Backend (tool calls during the call, if your agent is
+    configured to use them):
     `POST /api/voice/context`, `POST /api/voice/medication/taken`,
     `POST /api/voice/medication/snooze`, `POST /api/voice/symptom`,
     `POST /api/voice/side-effect`.
   - Samvaad → Backend (after the call ends):
-    `POST /api/webhooks/sarvam` with a structured outcome (see
-    `SarvamWebhookPayload` in `app/schemas/schemas.py`).
+    `POST /api/webhooks/sarvam?token=SARVAM_WEBHOOK_SECRET` with Sarvam's
+    documented webhook payload (`attempt_id`, `status`, `duration`,
+    `interaction_id`, `final_agent_variables`, `interaction_transcript`,
+    `webhook_config`). See `SarvamWebhookPayload` in
+    `app/schemas/schemas.py` - it also derives our internal
+    `StructuredCallOutcome` from `final_agent_variables`, so **your Samvaad
+    agent must be configured to set these variable names** during the
+    conversation: `medication_taken`, `snooze_requested`, `snooze_minutes`,
+    `symptom_reported`, `symptom_name`, `symptom_severity`, `symptom_trend`,
+    `side_effect_reported`, `side_effect_name`, `side_effect_severity`.
+  - Sarvam has no documented webhook signature scheme, so we verify
+    inbound webhooks via our own `?token=SARVAM_WEBHOOK_SECRET` query
+    parameter, which we append ourselves when building the
+    `webhook_config.url` at call-trigger time.
 
 ## 9. How the scheduler works
 
@@ -226,7 +260,7 @@ For judging without a live phone call:
 
 1. Upload a prescription → extract → confirm (creates real reminders).
 2. On the dashboard, **"Talk to Dawa Dost"** tries a real Samvaad call first
-   (if `SARVAM_AGENT_ID`/`SARVAM_DEPLOYMENT_ID` are configured); if that
+   (if the `SARVAM_VOICE_API_KEY`/`SARVAM_APP_ID`/etc. variables are configured); if that
    fails or isn't configured, it falls back to
    `POST /api/demo/simulate-outcome`, which fabricates a completed-call
    webhook and runs it through the real processing path.
