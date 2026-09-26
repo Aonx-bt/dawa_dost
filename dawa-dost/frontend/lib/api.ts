@@ -124,4 +124,14 @@ export const api = {
     }),
 
   fileUrl: (path: string) => `${API_URL}${path}`,
+
+  translate: (texts: string[], targetLanguageCode: string, sourceLanguageCode = "auto") =>
+    request<{ translated_texts: string[] }>("/api/translate", {
+      method: "POST",
+      body: JSON.stringify({
+        texts,
+        target_language_code: targetLanguageCode,
+        source_language_code: sourceLanguageCode,
+      }),
+    }),
 };

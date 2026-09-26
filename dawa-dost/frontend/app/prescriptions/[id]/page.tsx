@@ -7,6 +7,8 @@ import { api, ApiError } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { ErrorState, LoadingState } from "@/components/States";
 import { ReviewBadge } from "@/components/Badge";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useTranslatedTexts } from "@/hooks/useTranslatedTexts";
 import type { ExtractedMedication, Prescription } from "@/types";
 
 const AMBIGUOUS_CODES = new Set(["sos", "prn", "bd", "tds", "qds", "stat"]);
@@ -110,12 +112,59 @@ export default function PrescriptionDetailPage() {
   }
 
   return (
+    <PrescriptionReview
+      prescription={prescription}
+      meds={meds}
+      editingIndex={editingIndex}
+      setEditingIndex={setEditingIndex}
+      updateMed={updateMed}
+      handleConfirm={handleConfirm}
+      submitting={submitting}
+    />
+  );
+}
+
+function PrescriptionReview({
+  prescription,
+  meds,
+  editingIndex,
+  setEditingIndex,
+  updateMed,
+  handleConfirm,
+  submitting,
+}: {
+  prescription: Prescription;
+  meds: ExtractedMedication[];
+  editingIndex: number | null;
+  setEditingIndex: (i: number | null) => void;
+  updateMed: (index: number, patch: Partial<ExtractedMedication>) => void;
+  handleConfirm: () => void;
+  submitting: boolean;
+}) {
+  // Translation is display-only: the underlying `meds` state (sent to the
+  // backend on confirm, and shown in the edit form) always stays in the
+  // originally extracted language so nothing gets lost or mis-parsed.
+  const { translated: translatedNames } = useTranslatedTexts(meds.map((m) => m.medicine_name));
+  const { translated: translatedDoses } = useTranslatedTexts(meds.map((m) => m.dose || ""));
+  const { translated: translatedDurations } = useTranslatedTexts(meds.map((m) => m.duration || ""));
+  const { translated: translatedFoodInstructions } = useTranslatedTexts(
+    meds.map((m) => m.food_instruction || ""),
+  );
+  const { translated: translatedDiagnoses } = useTranslatedTexts(prescription.diagnoses);
+  const { translated: translatedSymptoms } = useTranslatedTexts(prescription.symptoms);
+
+  return (
     <div className="flex flex-col gap-4 p-4">
-      <h1 className="pt-2 text-xl font-semibold text-slate-900">Prescription scanned ✓</h1>
-      <p className="text-sm text-slate-500">
-        We found {meds.length} medicine{meds.length === 1 ? "" : "s"}. Please review before we
-        create your reminders.
-      </p>
+      <div className="flex items-start justify-between pt-2">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Prescription scanned ✓</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            We found {meds.length} medicine{meds.length === 1 ? "" : "s"}. Please review before we
+            create your reminders.
+          </p>
+        </div>
+        <LanguageToggle />
+      </div>
 
       {(prescription.diagnoses.length > 0 || prescription.symptoms.length > 0) && (
         <Card className="p-4">
@@ -125,13 +174,13 @@ export default function PrescriptionDetailPage() {
           {prescription.diagnoses.length > 0 && (
             <p className="text-sm text-slate-700">
               <span className="font-medium">Diagnosis: </span>
-              {prescription.diagnoses.join(", ")}
+              {translatedDiagnoses.join(", ")}
             </p>
           )}
           {prescription.symptoms.length > 0 && (
             <p className="text-sm text-slate-700">
               <span className="font-medium">Symptoms: </span>
-              {prescription.symptoms.join(", ")}
+              {translatedSymptoms.join(", ")}
             </p>
           )}
         </Card>
@@ -146,7 +195,7 @@ export default function PrescriptionDetailPage() {
               <div className="mb-2 flex items-start justify-between">
                 <div>
                   <p className="text-base font-semibold uppercase text-slate-900">
-                    {med.medicine_name}
+                    {translatedNames[i]}
                   </p>
                   {med.strength && <p className="text-sm text-slate-500">{med.strength}</p>}
                 </div>
@@ -185,11 +234,11 @@ export default function PrescriptionDetailPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-1 text-sm text-slate-600">
-                  {med.dose && <p>{med.dose}</p>}
+                  {med.dose && <p>{translatedDoses[i]}</p>}
                   <p>{med.frequency || "No frequency extracted"}</p>
-                  {med.duration && <p>{med.duration}</p>}
+                  {med.duration && <p>{translatedDurations[i]}</p>}
                   {med.food_instruction && (
-                    <p className="text-teal-700">Take {med.food_instruction.toLowerCase()}</p>
+                    <p className="text-teal-700">Take {translatedFoodInstructions[i]?.toLowerCase()}</p>
                   )}
                   <button
                     onClick={() => setEditingIndex(i)}

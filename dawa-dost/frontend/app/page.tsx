@@ -6,6 +6,8 @@ import { api, ApiError } from "@/lib/api";
 import { Card } from "@/components/Card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/States";
 import { StatusBadge } from "@/components/Badge";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useTranslatedTexts } from "@/hooks/useTranslatedTexts";
 import type { Dashboard } from "@/types";
 
 function greeting() {
@@ -79,19 +81,40 @@ export default function DashboardPage() {
     );
   if (!data) return null;
 
+  return <DashboardBody data={data} callingId={callingId} onCallMeNow={handleCallMeNow} />;
+}
+
+function DashboardBody({
+  data,
+  callingId,
+  onCallMeNow,
+}: {
+  data: Dashboard;
+  callingId: string | null;
+  onCallMeNow: () => void;
+}) {
   const firstName = data.user.name.split(" ")[0];
+
+  const medicationNames = data.today.map((d) => d.medication_name);
+  const { translated: translatedMedNames } = useTranslatedTexts(medicationNames);
+
+  const symptomNames = data.symptom_trends.map((t) => t.symptom);
+  const { translated: translatedSymptoms } = useTranslatedTexts(symptomNames);
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="pt-2">
-        <h1 className="text-xl font-semibold text-slate-900">
-          {greeting()}, {firstName} 👋
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Your treatment is{" "}
-          <span className="font-semibold text-teal-700">{data.adherence_percent}%</span> on
-          track
-        </p>
+      <header className="flex items-start justify-between pt-2">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">
+            {greeting()}, {firstName} 👋
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Your treatment is{" "}
+            <span className="font-semibold text-teal-700">{data.adherence_percent}%</span> on
+            track
+          </p>
+        </div>
+        <LanguageToggle />
       </header>
 
       <Card className="p-5">
@@ -122,11 +145,11 @@ export default function DashboardPage() {
           />
         ) : (
           <Card className="divide-y divide-slate-100">
-            {data.today.map((dose) => (
+            {data.today.map((dose, i) => (
               <div key={dose.reminder_id} className="flex items-center justify-between p-4">
                 <div>
                   <p className="text-sm font-medium text-slate-500">{formatTime(dose.scheduled_at)}</p>
-                  <p className="text-base font-semibold text-slate-900">{dose.medication_name}</p>
+                  <p className="text-base font-semibold text-slate-900">{translatedMedNames[i]}</p>
                   {dose.dose && <p className="text-sm text-slate-500">{dose.dose}</p>}
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -147,7 +170,7 @@ export default function DashboardPage() {
             Symptom progress
           </h2>
           <Card className="p-4">
-            {data.symptom_trends.map((trend) => {
+            {data.symptom_trends.map((trend, i) => {
               const points = trend.points.filter((p) => p.severity !== null);
               const latest = points[points.length - 1];
               const first = points[0];
@@ -158,7 +181,7 @@ export default function DashboardPage() {
               return (
                 <div key={trend.symptom} className="mb-3 last:mb-0">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium capitalize text-slate-800">{trend.symptom}</p>
+                    <p className="font-medium capitalize text-slate-800">{translatedSymptoms[i]}</p>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase text-slate-500">
                       Patient-reported
                     </span>
@@ -185,7 +208,7 @@ export default function DashboardPage() {
           Scan Prescription
         </Link>
         <button
-          onClick={handleCallMeNow}
+          onClick={onCallMeNow}
           disabled={!!callingId || !data.today.some((d) => d.status === "PENDING" || d.status === "SNOOZED")}
           className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white px-4 py-4 text-center text-sm font-semibold text-teal-700 shadow-sm ring-1 ring-teal-100 hover:bg-teal-50 disabled:opacity-50"
         >
