@@ -8,7 +8,10 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/States";
 import { StatusBadge } from "@/components/Badge";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslatedTexts } from "@/hooks/useTranslatedTexts";
+import { VoiceWidget } from "@/components/VoiceWidget";
 import type { Dashboard } from "@/types";
+
+const VOICE_WIDGET_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_SARVAM_APP_ID);
 
 function greeting() {
   const hour = new Date().getHours();
@@ -207,14 +210,21 @@ function DashboardBody({
           <span className="text-xl">📷</span>
           Scan Prescription
         </Link>
-        <button
-          onClick={onCallMeNow}
-          disabled={!!callingId || !data.today.some((d) => d.status === "PENDING" || d.status === "SNOOZED")}
-          className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white px-4 py-4 text-center text-sm font-semibold text-teal-700 shadow-sm ring-1 ring-teal-100 hover:bg-teal-50 disabled:opacity-50"
-        >
-          <span className="text-xl">🎙️</span>
-          {callingId ? "Calling..." : "Talk to Dawa Dost"}
-        </button>
+        {VOICE_WIDGET_CONFIGURED ? (
+          <div className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white px-4 py-4 text-center shadow-sm ring-1 ring-teal-100">
+            <span className="text-xl">🎙️</span>
+            <VoiceWidget userId={data.user.id} buttonText="Talk to Dawa Dost" />
+          </div>
+        ) : (
+          <button
+            onClick={onCallMeNow}
+            disabled={!!callingId || !data.today.some((d) => d.status === "PENDING" || d.status === "SNOOZED")}
+            className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white px-4 py-4 text-center text-sm font-semibold text-teal-700 shadow-sm ring-1 ring-teal-100 hover:bg-teal-50 disabled:opacity-50"
+          >
+            <span className="text-xl">🎙️</span>
+            {callingId ? "Calling..." : "Talk to Dawa Dost"}
+          </button>
+        )}
       </div>
 
       {data.recent_calls.length > 0 && (
