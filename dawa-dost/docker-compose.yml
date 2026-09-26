@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./dawa_dost.db}
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+      - SARVAM_AGENT_ID=${SARVAM_AGENT_ID}
+      - SARVAM_DEPLOYMENT_ID=${SARVAM_DEPLOYMENT_ID}
+      - SARVAM_WEBHOOK_SECRET=${SARVAM_WEBHOOK_SECRET}
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - CORS_ORIGINS=http://localhost:3000
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
